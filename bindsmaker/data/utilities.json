@@ -1,0 +1,134 @@
+[
+  {
+    "id": "powertoys",
+    "name": "Microsoft PowerToys",
+    "category": "utility",
+    "popularity": "medium",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["powertoys.exe"],
+    "notes": "Only modules that are switched on register their shortcuts.",
+    "shortcuts": {
+      "Alt+Space": "PowerToys Run",
+      "Win+Alt+Space": "Command Palette",
+      "Win+Shift+C": "Colour Picker",
+      "Win+Shift+T": "Text Extractor",
+      "Win+Ctrl+T": "Always On Top",
+      "Win+Shift+`": "FancyZones editor",
+      "Win+Shift+M": "Screen Ruler",
+      "Win+Shift+/": "Shortcut Guide",
+      "Win+Shift+V": "Advanced Paste",
+      "Win+Ctrl+Alt+V": "Paste as plain text",
+      "Win+Shift+H": "Mouse Highlighter",
+      "Win+Shift+D": "Mouse Jump",
+      "Win+Alt+P": "Mouse Pointer Crosshairs",
+      "Win+Ctrl+Shift+T": "Crop And Lock: thumbnail",
+      "Win+Ctrl+Shift+R": "Crop And Lock: reparent",
+      "Win+Ctrl+`": "Workspaces editor",
+      "Win+Ctrl+Alt+K": "Keyboard Manager: toggle",
+      "Ctrl+Space": "Peek (in File Explorer)"
+    }
+  },
+  {
+    "id": "sharex",
+    "name": "ShareX",
+    "category": "utility",
+    "popularity": "medium",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["sharex.exe"],
+    "shortcuts": {
+      "PrintScreen": "Capture entire screen",
+      "Ctrl+PrintScreen": "Capture region",
+      "Alt+PrintScreen": "Capture active window",
+      "Shift+PrintScreen": "Screen recording",
+      "Ctrl+Shift+PrintScreen": "Screen recording (GIF)"
+    }
+  },
+  {
+    "id": "greenshot",
+    "name": "Greenshot / Lightshot",
+    "category": "utility",
+    "popularity": "low",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["greenshot.exe", "lightshot.exe"],
+    "shortcuts": {
+      "PrintScreen": "Capture region",
+      "Alt+PrintScreen": "Capture window",
+      "Ctrl+PrintScreen": "Capture full screen",
+      "Shift+PrintScreen": "Capture last region"
+    }
+  },
+  {
+    "id": "everything",
+    "name": "Everything / Flow Launcher / Wox",
+    "category": "utility",
+    "popularity": "low",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["everything.exe", "flow.launcher.exe", "wox.exe"],
+    "shortcuts": {
+      "Alt+Space": "Launcher search box"
+    }
+  },
+  {
+    "id": "spotify",
+    "name": "Spotify",
+    "category": "media",
+    "popularity": "high",
+    "scope": "app",
+    "platforms": ["windows", "linux"],
+    "processes": ["spotify.exe", "spotify"],
+    "shortcuts": {
+      "Ctrl+Right": "Next track",
+      "Ctrl+Left": "Previous track",
+      "Ctrl+Up": "Volume up",
+      "Ctrl+Down": "Volume down",
+      "Ctrl+K": "Search",
+      "Ctrl+L": "Search",
+      "Ctrl+N": "New playlist",
+      "Ctrl+S": "Shuffle",
+      "Ctrl+R": "Repeat",
+      "Ctrl+Shift+N": "New playlist folder",
+      "Ctrl+Shift+W": "Close window",
+      "Alt+Shift+B": "Like current song",
+      "Alt+Shift+J": "Toggle shuffle",
+      "Alt+Shift+R": "Toggle repeat",
+      "Alt+Shift+H": "Home",
+      "Alt+Shift+Q": "Queue"
+    }
+  },
+  {
+    "id": "obsidian",
+    "name": "Obsidian / Notion",
+    "category": "office",
+    "popularity": "low",
+    "scope": "app",
+    "platforms": ["windows", "linux"],
+    "processes": ["obsidian.exe", "obsidian", "notion.exe"],
+    "shortcuts": {
+      "Ctrl+Shift+F": "Search in all files",
+      "Ctrl+Shift+N": "New window",
+      "Ctrl+Shift+L": "Toggle dark mode (Notion)",
+      "Ctrl+Shift+U": "Go up a level (Notion)",
+      "Ctrl+Shift+M": "Comment (Notion)",
+      "Ctrl+Shift+H": "Highlight colour (Notion)",
+      "Ctrl+Shift+K": "Clear formatting",
+      "Ctrl+Shift+Up": "Move block up",
+      "Ctrl+Shift+Down": "Move block down",
+      "Ctrl+Alt+Left": "Navigate back",
+      "Ctrl+Alt+Right": "Navigate forward",
+      "Ctrl+Alt+0": "Text block (Notion)",
+      "Ctrl+Alt+1": "Heading 1 (Notion)",
+      "Ctrl+Alt+2": "Heading 2 (Notion)",
+      "Ctrl+Alt+3": "Heading 3 (Notion)",
+      "Ctrl+Alt+T": "Toggle all toggles (Notion)",
+      "Ctrl+Alt+M": "Comment",
+      "Ctrl+E": "Toggle edit/preview",
+      "Ctrl+G": "Graph view",
+      "Ctrl+O": "Quick switcher",
+      "Ctrl+P": "Command palette"
+    }
+  }
+]
