@@ -44,7 +44,7 @@ def test_reserve_flow(capsys, tmp_path):
     assert "Change resolution" in capsys.readouterr().out
     out_file = tmp_path / "binds.ahk"
     assert main(["export", "--format", "ahk", "-o", str(out_file)]) == 0
-    assert "^!+r::" in out_file.read_text()
+    assert "^!+r::" in out_file.read_text(encoding="utf-8")
     assert main(["release", "ctrl+alt+shift+r"]) == 0
     assert main(["export"]) == 1
 
@@ -87,7 +87,7 @@ def test_resolutions_flow(capsys, tmp_path):
     args = ["resolutions", "1920x1080", "2560x1440@144", "--platform", "windows", "--no-live", "--seed", "7"]
     assert main(args + ["-o", str(out_file)]) == 0
     first = capsys.readouterr().out
-    script = out_file.read_text()
+    script = out_file.read_text(encoding="utf-8")
     assert "ChangeResolution(1920, 1080)" in script
     assert "ChangeResolution(2560, 1440, 144)" in script
     assert script.count("ChangeResolution(width, height, hz := 0)") == 1

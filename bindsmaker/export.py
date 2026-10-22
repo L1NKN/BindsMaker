@@ -33,7 +33,8 @@ def to_ahk(binds: list) -> str:
         if command:
             lines.append(f"    Run({_ahk_string(command)})")
         if not res and not command:
-            lines.append(f"    MsgBox({_ahk_string(f'{combo} pressed: put the action for “{label}” here')})")
+            message = f'{combo} pressed: put the action for "{label}" here'
+            lines.append(f"    MsgBox({_ahk_string(message)})")
         lines.append("}")
         lines.append("")
     if any(b.get("resolution") for b in binds):
