@@ -1,6 +1,8 @@
 import pytest
 
+from bindsmaker import mybinds
 from bindsmaker.cli import main
+from bindsmaker.resolution import Resolution, ResolutionError
 from bindsmaker.export import to_ahk, to_xbindkeys
 
 
@@ -67,3 +69,48 @@ def test_xbindkeys_export():
     text = to_xbindkeys([{"combo": "Win+Alt+Shift+R", "label": "Res", "command": "xrandr -s 1920x1080"}])
     assert '"xrandr -s 1920x1080"' in text
     assert "Mod4 + Mod1 + Shift + r" in text
+
+
+def test_two_normal_keys_explains_itself(capsys):
+    assert main(["check", "b+shift+f3", "--no-live"]) == 2
+    assert "F13-F24" in capsys.readouterr().err
+
+
+def test_random(capsys):
+    assert main(["random", "-n", "4", "--seed", "3", "--platform", "windows", "--no-live"]) == 0
+    out = capsys.readouterr().out
+    assert "Random free keybinds" in out and out.count("\n  ") >= 5
+
+
+def test_resolutions_flow(capsys, tmp_path):
+    out_file = tmp_path / "res.ahk"
+    args = ["resolutions", "1920x1080", "2560x1440@144", "--platform", "windows", "--no-live", "--seed", "7"]
+    assert main(args + ["-o", str(out_file)]) == 0
+    first = capsys.readouterr().out
+    script = out_file.read_text()
+    assert "ChangeResolution(1920, 1080)" in script
+    assert "ChangeResolution(2560, 1440, 144)" in script
+    assert script.count("ChangeResolution(width, height, hz := 0)") == 1
+    binds = {b["resolution"]: b["combo"] for b in mybinds.load_binds()}
+    assert set(binds) == {"1920x1080", "2560x1440@144"}
+    assert len(set(binds.values())) == 2
+    # Running again keeps the existing binds; --reroll replaces them.
+    assert main(args) == 0
+    assert "(kept)" in capsys.readouterr().out
+    assert main(args + ["--reroll", "--seed", "8"]) == 0
+    assert len(mybinds.load_binds()) == 2
+    assert "(new)" in capsys.readouterr().out and first
+
+
+def test_reserve_with_resolution(capsys):
+    assert main(["reserve", "ctrl+alt+shift+f17", "--resolution", "1280x720", "--platform", "windows"]) == 0
+    (bind,) = mybinds.load_binds()
+    assert bind == {"combo": "Ctrl+Alt+Shift+F17", "label": "Resolution 1280x720", "resolution": "1280x720"}
+    assert main(["reserve", "ctrl+alt+shift+f18", "--resolution", "huge", "--platform", "windows"]) == 2
+
+
+def test_resolution_parsing():
+    assert str(Resolution.parse("1920 x 1080")) == "1920x1080"
+    assert str(Resolution.parse("2560x1440@144Hz")) == "2560x1440@144"
+    with pytest.raises(ResolutionError):
+        Resolution.parse("1080p")

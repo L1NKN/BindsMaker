@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .keys import Combo
+from .resolution import Resolution
 
 FILENAME = "my_binds.json"
 
@@ -31,12 +32,15 @@ def save_binds(binds: list, base: Path = None) -> Path:
     return path
 
 
-def reserve(combo: Combo, label: str = "", command: str = "", base: Path = None) -> list:
+def reserve(combo: Combo, label: str = "", command: str = "", base: Path = None,
+            resolution: str = "") -> list:
     """Add or update a bind. Returns the new list."""
     binds = [b for b in load_binds(base) if b["combo"] != str(combo)]
     entry = {"combo": str(combo), "label": label}
     if command:
         entry["command"] = command
+    if resolution:
+        entry["resolution"] = str(Resolution.parse(resolution))
     binds.append(entry)
     binds.sort(key=lambda b: Combo.parse(b["combo"]).sort_key())
     save_binds(binds, base)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 import re
 from dataclasses import dataclass, field
 
@@ -28,6 +29,15 @@ DEFAULT_FAMILIES = (
 )
 
 DEFAULT_KEY_GROUPS = ("letters", "digits", "function")
+
+# Macro mode (Stream Deck, macro pad, mouse buttons): a device presses the keys, so
+# awkward combos are fine and F13-F24 - which no normal keyboard has - are ideal.
+MACRO_FAMILIES = (
+    "Ctrl+Alt+Shift", "Win+Alt+Shift", "Win+Ctrl+Alt", "Win+Ctrl+Shift", "Win+Ctrl+Alt+Shift",
+    "Ctrl+Shift", "Ctrl+Alt", "Alt+Shift", "Win+Alt", "Win+Ctrl", "Win+Shift",
+    "Ctrl", "Alt", "Shift", "",
+)
+MACRO_KEY_GROUPS = ("extended", "function", "letters", "digits")
 
 CONFLICT_PENALTY = {"high": 30, "medium": 20, "low": 10}
 
@@ -96,7 +106,9 @@ def typing_key(combo: Combo) -> bool:
     return typable and combo.mods <= {"Shift"}
 
 
-def evaluate(combo: Combo, db, purpose: str = "", mnemonic: dict = None) -> Evaluation:
+def evaluate(combo: Combo, db, purpose: str = "", mnemonic: dict = None,
+             macro: bool = False) -> Evaluation:
+    """Score a combo. macro=True skips the "hard to press" penalties (a device presses it)."""
     conflicts = db.conflicts(combo)
     reasons = []
     score = 100.0
@@ -133,32 +145,40 @@ def evaluate(combo: Combo, db, purpose: str = "", mnemonic: dict = None) -> Eval
         reasons.append((-risk, f"{fam} combos are rarely used by apps"))
 
     n_mods = len(combo.mods)
-    if n_mods == 3:
+    if macro:
+        pass
+    elif n_mods == 3:
         reasons.append((-3, "three modifiers - slightly harder to press"))
     elif n_mods == 4:
         reasons.append((-10, "four modifiers - awkward to press"))
 
     key = combo.key
     if key in EXTENDED_FUNCTION_KEYS:
-        reasons.append((-5, f"{key} needs a macro key, mouse button or remap (no physical key on most keyboards)"))
+        if macro:
+            reasons.append((5, f"{key} has no physical key, so it can't be pressed by accident"))
+        else:
+            reasons.append((-5, f"{key} needs a macro key, mouse button or remap "
+                                "(no physical key on most keyboards)"))
     elif key in PUNCTUATION:
         reasons.append((-6, "punctuation keys move around on non-US layouts"))
     elif key in NAVIGATION:
         reasons.append((-5, "navigation keys are used for text and window movement"))
     elif key in NUMPAD:
-        reasons.append((-8, "many laptops and compact keyboards have no numpad"))
+        if not macro:
+            reasons.append((-8, "many laptops and compact keyboards have no numpad"))
     elif key in DIGITS or key in FUNCTION_KEYS:
-        reasons.append((-2, "digit / function row is a longer reach"))
+        if not macro:
+            reasons.append((-2, "digit / function row is a longer reach"))
     elif key not in LETTERS:
         reasons.append((-8, f"{key} is a special key most apps react to"))
 
-    if key in LETTERS or key in DIGITS or key in FUNCTION_KEYS or key in PUNCTUATION:
+    if not macro and (key in LETTERS or key in DIGITS or key in FUNCTION_KEYS or key in PUNCTUATION):
         if key in CENTRE:
             reasons.append((-1, "centre of the keyboard"))
         elif key not in LEFT_HAND:
             reasons.append((-3, "needs two hands"))
 
-    if "Win" in combo.mods:
+    if "Win" in combo.mods and not macro:
         reasons.append((-4, "gaming keyboards often disable the Win key in game mode"))
 
     if combo.mods == {"Ctrl", "Alt"}:
@@ -196,24 +216,33 @@ def candidates(families=None, key_groups=None, keys=None):
                 yield combo
 
 
-def suggest(db, purpose: str = "", count: int = 10, families=None, key_groups=None, keys=None,
-            allow_conflicts: bool = False, exclude=(), live_check=None) -> list:
-    """Return the best `count` evaluations.
-
-    live_check -- optional callable(Combo) -> bool returning True if the combo is
-                  currently grabbed by another program; those are skipped.
-    """
+def _pool(db, purpose, families, key_groups, keys, allow_conflicts, exclude, macro):
+    if macro:
+        families = families or MACRO_FAMILIES
+        key_groups = key_groups or MACRO_KEY_GROUPS
     mnemonic = purpose_letters(purpose)
     excluded = set(exclude)
     pool = []
     for combo in candidates(families, key_groups, keys):
         if combo in excluded:
             continue
-        ev = evaluate(combo, db, purpose, mnemonic)
+        ev = evaluate(combo, db, purpose, mnemonic, macro=macro)
         if ev.blocked or (ev.conflicts and not allow_conflicts):
             continue
         pool.append(ev)
     pool.sort(key=lambda e: (-e.raw, e.combo.sort_key()))
+    return pool
+
+
+def suggest(db, purpose: str = "", count: int = 10, families=None, key_groups=None, keys=None,
+            allow_conflicts: bool = False, exclude=(), live_check=None, macro: bool = False) -> list:
+    """Return the best `count` evaluations.
+
+    live_check -- optional callable(Combo) -> bool returning True if the combo is
+                  currently grabbed by another program; those are skipped.
+    macro      -- the combo will be sent by a Stream Deck / macro pad, not typed by hand.
+    """
+    pool = _pool(db, purpose, families, key_groups, keys, allow_conflicts, exclude, macro)
 
     # Keep the list varied: cap how many suggestions share one modifier family.
     cap = max(2, math.ceil(count / 3))
@@ -242,3 +271,28 @@ def alternatives(combo: Combo, db, purpose: str = "", count: int = 3, live_check
     fams = [f for f in DEFAULT_FAMILIES if parse_family(f) != combo.mods]
     return suggest(db, purpose, count, families=fams, keys=[combo.key], live_check=live_check)
 
+
+def pick_random(db, count: int = 1, families=None, key_groups=None, keys=None, exclude=(),
+                live_check=None, macro: bool = True, rng=None, spread: int = 10) -> list:
+    """Pick `count` different random combos from the best conflict-free ones.
+
+    Only combos scoring within `spread` points of the best candidate are eligible,
+    so "random" never means "worse".
+    """
+    rng = rng or random.Random()
+    pool = _pool(db, "", families, key_groups, keys, False, exclude, macro)
+    if not pool:
+        return []
+    best = pool[0].raw
+    eligible = [ev for ev in pool if ev.raw >= best - spread]
+    if len(eligible) < count * 3:  # widen the net rather than run dry
+        eligible = pool
+    rng.shuffle(eligible)
+    chosen = []
+    for ev in eligible:
+        if len(chosen) >= count:
+            break
+        if live_check is not None and live_check(ev.combo):
+            continue
+        chosen.append(ev)
+    return chosen

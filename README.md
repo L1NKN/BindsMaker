@@ -11,6 +11,47 @@ grabbed it, and suggests uncommon combos that are free and easy to remember.
 
 ![Checking Ctrl+Shift+R](docs/check.png)
 
+## Stream Deck / macro pad: one hotkey per resolution
+
+When a Stream Deck (or macro pad, or a spare mouse button) sends the keys for
+you, the combo doesn't need to be comfortable. It just needs to be something
+nothing else will ever use. The best keys for that are **F13–F24**: almost no
+keyboard has them, so no program uses them and you can't press them by
+accident. [Elgato recommends them too](https://www.elgato.com/explorer/products/stream-deck/how-to-use-elgato-stream-deck-with-any-application/).
+
+```console
+$ bindsmaker resolutions 1920x1080 2560x1440@144 1280x720 -o resolutions.ahk
+Resolution binds (put each combo on a Stream Deck button with the Hotkey action)
+
+  1920x1080      ->  Ctrl+Alt+Shift+F17  (new)
+  2560x1440@144  ->  Win+Alt+F22         (new)
+  1280x720       ->  Win+Ctrl+Shift+F14  (new)
+
+Wrote all 3 of your binds to resolutions.ahk - double-click it (needs AutoHotkey v2) and leave it running.
+```
+
+1. Run the command above, or use the **Stream Deck resolutions** tab in the
+   app. Each resolution gets a random combo that no known app uses, and the
+   combos are saved to *My binds*. Running the command again keeps the same
+   combos. Add `--reroll` to get new ones, or `--keys extended` to use only
+   F13–F24.
+2. Install [AutoHotkey v2](https://www.autohotkey.com/) and double-click
+   `resolutions.ahk`. To start it with Windows, put a shortcut to it in
+   `shell:startup`. The script changes the resolution of your main display
+   through the Windows display settings API.
+3. In the Stream Deck app, drag a **Hotkey** action onto a button and enter
+   the combo. For F13–F24, click the small arrow next to the hotkey field and
+   look in the F-keys section.
+
+`bindsmaker random -n 5` gives you random free combos for anything else.
+Random picks only come from the best-scoring free combos.
+
+A combo like `B+Shift+F3`, which holds down a letter as if it were Ctrl,
+won't work as a system-wide hotkey on Windows, and the Stream Deck would type
+the "b" into whatever window is open. Use Ctrl/Alt/Shift/Win plus one key.
+
+![Stream Deck tab](docs/stream-deck.png)
+
 ## What it does
 
 - **Check a combo.** See every known app that uses it, whether a running
@@ -98,8 +139,10 @@ $ bindsmaker export -o mybinds.ahk     # double-click mybinds.ahk to activate yo
 | Command | What it does |
 | --- | --- |
 | `check COMBO [purpose...]` | Show conflicts, the live check, the score and alternatives. Exits with 1 if the combo is blocked or taken. |
-| `suggest [purpose...]` | Suggest free combos. Options: `-n 20`, `--families "Ctrl+Alt+Shift,Win+Alt"`, `--keys letters,digits,function,extended,punctuation,navigation,numpad`, `--key R`, `--avoid COMBO`, `--allow-conflicts`. |
-| `reserve COMBO -l LABEL [-c COMMAND]` | Save a combo to *My binds*. It refuses a combo that clashes unless you add `--force`. |
+| `suggest [purpose...]` | Suggest free combos. Options: `--macro` (ignore how hard a combo is to press), `-n 20`, `--families "Ctrl+Alt+Shift,Win+Alt"`, `--keys letters,digits,function,extended,punctuation,navigation,numpad`, `--key R`, `--avoid COMBO`, `--allow-conflicts`. |
+| `random [-n 5]` | Random free combos for a Stream Deck or macro pad, preferring F13–F24. Add `--by-hand` if you'll press the combo yourself. |
+| `resolutions RES... [-o FILE]` | Give each resolution (for example `1920x1080` or `2560x1440@144`) a random free combo, save them, and optionally write the script. |
+| `reserve COMBO -l LABEL [-c COMMAND] [-r RES]` | Save a combo to *My binds*. It refuses a combo that clashes unless you add `--force`. |
 | `release COMBO` | Remove a combo from *My binds*. |
 | `mine` | List your binds. |
 | `export [--format ahk\|xbindkeys] [-o FILE]` | Write your binds as a script. |
@@ -134,6 +177,7 @@ Every combo starts at 100 and loses points for these things:
 | −3 / −10 | Three or four modifiers are harder to press. |
 | −1 to −8 | The key position: two-handed reach, punctuation that moves around between layouts, a numpad that laptops don't have, or F13–F24 needing a macro key. |
 | −4 | The combo uses the Win key, which gaming keyboards often disable in game mode. |
+| +5 (macro mode) | In macro mode (Stream Deck, `random`, `resolutions`), the reach and modifier-count penalties are skipped and F13–F24 get a bonus. |
 | +4 / +10 | The key matches a word in what you said the bind is for. |
 
 ## Adding apps

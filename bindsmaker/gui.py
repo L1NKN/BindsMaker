@@ -16,7 +16,8 @@ from .detect import running_process_names
 from .export import export
 from .keys import KEY_GROUPS, Combo, ComboError, normalize_key
 from .report import check_report, short_reasons
-from .suggest import DEFAULT_FAMILIES, DEFAULT_KEY_GROUPS, alternatives, evaluate, suggest
+from .resolution import Resolution, ResolutionError
+from .suggest import DEFAULT_FAMILIES, DEFAULT_KEY_GROUPS, alternatives, evaluate, pick_random, suggest
 
 _MODIFIER_KEYSYMS = {
     "Control_L": "Ctrl", "Control_R": "Ctrl",
@@ -71,14 +72,17 @@ class BindsMakerApp:
         nb.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.notebook = nb
         self.tab_suggest = ttk.Frame(nb, padding=8)
+        self.tab_deck = ttk.Frame(nb, padding=8)
         self.tab_check = ttk.Frame(nb, padding=8)
         self.tab_mine = ttk.Frame(nb, padding=8)
         self.tab_db = ttk.Frame(nb, padding=8)
         nb.add(self.tab_suggest, text="Suggest")
+        nb.add(self.tab_deck, text="Stream Deck resolutions")
         nb.add(self.tab_check, text="Check a combo")
         nb.add(self.tab_mine, text="My binds")
         nb.add(self.tab_db, text="Shortcut database")
         self._build_suggest()
+        self._build_deck()
         self._build_check()
         self._build_mine()
         self._build_db()
@@ -128,7 +132,8 @@ class BindsMakerApp:
         ttk.Label(row, text="How many").pack(side="left", padx=(12, 4))
         self.count = tk.IntVar(value=15)
         ttk.Spinbox(row, from_=1, to=100, textvariable=self.count, width=5).pack(side="left")
-        ttk.Button(row, text="Suggest", command=self.run_suggest).pack(side="left", padx=8)
+        ttk.Button(row, text="Suggest", command=self.run_suggest).pack(side="left", padx=(8, 4))
+        ttk.Button(row, text="Random", command=self.run_random).pack(side="left")
 
         fams = ttk.LabelFrame(t, text="Modifier families", padding=6)
         fams.pack(fill="x", pady=(8, 4))
@@ -150,7 +155,11 @@ class BindsMakerApp:
                 row=0, column=i, sticky="w", padx=4)
         self.allow_conflicts = tk.BooleanVar(value=False)
         ttk.Checkbutton(keys, text="Also show combos used inside other apps",
-                        variable=self.allow_conflicts).grid(row=1, column=0, columnspan=4, sticky="w", padx=4)
+                        variable=self.allow_conflicts).grid(row=1, column=0, columnspan=3, sticky="w", padx=4)
+        self.macro = tk.BooleanVar(value=False)
+        ttk.Checkbutton(keys, text="Stream Deck / macro pad (doesn't need to be easy to press)",
+                        variable=self.macro, command=self._macro_toggled).grid(
+            row=1, column=3, columnspan=4, sticky="w", padx=4)
 
         self.sugg_tree = self._tree(t, (("combo", "Combo", 170), ("score", "Score", 60),
                                         ("why", "Why", 560)))
@@ -177,23 +186,44 @@ class BindsMakerApp:
         scroll.pack(side="right", fill="y")
         return tree
 
-    def run_suggest(self):
+    def _macro_toggled(self):
+        if self.macro.get():
+            self.key_vars["extended"].set(True)
+            self.family_vars["Win+Ctrl+Alt+Shift"].set(True)
+
+    def _suggest_inputs(self):
         families = [f for f, v in self.family_vars.items() if v.get()]
         groups = [g for g, v in self.key_vars.items() if v.get()]
         if not families or not groups:
             messagebox.showinfo("BindsMaker", "Pick at least one modifier family and one key group.")
-            return
+            return None
         try:
             count = max(1, int(self.count.get()))
         except (tk.TclError, ValueError):
             count = 15
+        return families, groups, count
+
+    def run_suggest(self):
+        self._fill_suggestions(lambda families, groups, count: suggest(
+            self.db(), self.purpose.get().strip(), count, families=families, key_groups=groups,
+            allow_conflicts=self.allow_conflicts.get(), live_check=self.live_check(),
+            macro=self.macro.get()))
+
+    def run_random(self):
+        def pick(families, groups, count):
+            evs = pick_random(self.db(), count, families=families, key_groups=groups,
+                              live_check=self.live_check(), macro=self.macro.get())
+            return sorted(evs, key=lambda e: -e.raw)
+        self._fill_suggestions(pick)
+
+    def _fill_suggestions(self, produce):
+        inputs = self._suggest_inputs()
+        if inputs is None:
+            return
         self.root.config(cursor="watch")
         self.root.update_idletasks()
         try:
-            self._suggestions = suggest(self.db(), self.purpose.get().strip(), count,
-                                        families=families, key_groups=groups,
-                                        allow_conflicts=self.allow_conflicts.get(),
-                                        live_check=self.live_check())
+            self._suggestions = produce(*inputs)
         finally:
             self.root.config(cursor="")
         self.sugg_tree.delete(*self.sugg_tree.get_children())
@@ -222,6 +252,100 @@ class BindsMakerApp:
         combo = self._selected_suggestion()
         if combo:
             self.edit_bind_dialog(str(combo), self.purpose.get().strip())
+
+    # -- stream deck tab ------------------------------------------------------
+
+    def _build_deck(self):
+        t = self.tab_deck
+        ttk.Label(t, wraplength=880, justify="left", text=(
+            "Get one random, unused key combo per screen resolution. In the Stream Deck app, put a "
+            "Hotkey action on a button and enter its combo (for F13-F24, click the small arrow next "
+            "to the hotkey field and look in the F-keys section). Then export the AutoHotkey script "
+            "and leave it running: when the Stream Deck sends the combo, the script changes the "
+            "resolution.")).pack(fill="x")
+        row = ttk.Frame(t)
+        row.pack(fill="x", pady=(8, 0))
+        ttk.Label(row, text="Resolutions").pack(side="left")
+        self.deck_res = tk.StringVar(value="1920x1080, 2560x1440@144, 1280x720")
+        entry = ttk.Entry(row, textvariable=self.deck_res, width=46)
+        entry.pack(side="left", padx=6)
+        entry.bind("<Return>", lambda _e: self.deck_pick())
+        self.deck_f_only = tk.BooleanVar(value=False)
+        ttk.Checkbutton(row, text="Only F13-F24", variable=self.deck_f_only).pack(side="left", padx=6)
+        ttk.Button(row, text="Pick combos", command=self.deck_pick).pack(side="left", padx=6)
+        self.deck_tree = self._tree(t, (("res", "Resolution", 160), ("combo", "Combo", 220),
+                                        ("state", "Status", 400)))
+        btns = ttk.Frame(t)
+        btns.pack(fill="x", pady=(6, 0))
+        ttk.Button(btns, text="Re-roll selected", command=self.deck_reroll).pack(side="left")
+        ttk.Button(btns, text="Save to My binds", command=self.deck_save).pack(side="left", padx=6)
+        ttk.Button(btns, text="Save + export AutoHotkey script...",
+                   command=lambda: self.deck_save(export_fmt="ahk")).pack(side="left")
+        self._deck_rows = []  # [Resolution, Combo, saved_combo_or_None]
+
+    def _deck_pick_one(self, taken):
+        groups = ["extended"] if self.deck_f_only.get() else None
+        picks = pick_random(self.db(), 1, key_groups=groups, exclude=taken, live_check=self.live_check())
+        return picks[0].combo if picks else None
+
+    def deck_pick(self):
+        try:
+            wanted = [Resolution.parse(r) for r in self.deck_res.get().replace(";", ",").split(",") if r.strip()]
+        except ResolutionError as exc:
+            messagebox.showerror("BindsMaker", str(exc))
+            return
+        saved = {b["resolution"]: Combo.parse(b["combo"]) for b in mybinds.load_binds() if b.get("resolution")}
+        self._deck_rows = []
+        taken = set()
+        for res in wanted:
+            combo = saved.get(str(res)) or self._deck_pick_one(taken)
+            if combo is None:
+                messagebox.showerror("BindsMaker", "Ran out of free combos.")
+                break
+            taken.add(combo)
+            self._deck_rows.append([res, combo, saved.get(str(res))])
+        self._deck_refresh()
+
+    def deck_reroll(self):
+        sel = self.deck_tree.selection()
+        if not sel:
+            messagebox.showinfo("BindsMaker", "Select a resolution first.")
+            return
+        row = self._deck_rows[int(sel[0])]
+        taken = {r[1] for r in self._deck_rows}
+        combo = self._deck_pick_one(taken)
+        if combo:
+            row[1] = combo
+            self._deck_refresh(select=sel[0])
+
+    def _deck_refresh(self, select=None):
+        self.deck_tree.delete(*self.deck_tree.get_children())
+        for i, (res, combo, saved) in enumerate(self._deck_rows):
+            if saved == combo:
+                state = "saved"
+            elif saved:
+                state = f"new - will replace {saved}"
+            else:
+                state = "new - not saved yet"
+            self.deck_tree.insert("", "end", iid=str(i), values=(str(res), str(combo), state))
+        if select is not None:
+            self.deck_tree.selection_set(select)
+
+    def deck_save(self, export_fmt=None):
+        if not self._deck_rows:
+            messagebox.showinfo("BindsMaker", "Pick combos first.")
+            return
+        for row in self._deck_rows:
+            res, combo, saved = row
+            if saved and saved != combo:
+                mybinds.release(saved)
+            mybinds.reserve(combo, f"Resolution {res}", resolution=str(res))
+            row[2] = combo
+        self.refresh_mine()
+        self.invalidate()
+        self._deck_refresh()
+        if export_fmt:
+            self.export_binds(export_fmt)
 
     # -- check tab ------------------------------------------------------------
 
@@ -325,8 +449,8 @@ class BindsMakerApp:
         t = self.tab_mine
         ttk.Label(t, text="Binds you've claimed. Suggestions and checks always treat these as taken.",
                   foreground="gray").pack(fill="x")
-        self.mine_tree = self._tree(t, (("combo", "Combo", 170), ("label", "What it does", 240),
-                                        ("command", "Command", 420)))
+        self.mine_tree = self._tree(t, (("combo", "Combo", 170), ("label", "What it does", 220),
+                                        ("resolution", "Resolution", 120), ("command", "Command", 320)))
         self.mine_tree.bind("<Double-1>", lambda _e: self.edit_selected_bind())
         btns = ttk.Frame(t)
         btns.pack(fill="x", pady=(6, 0))
@@ -344,14 +468,15 @@ class BindsMakerApp:
         self.mine_tree.delete(*self.mine_tree.get_children())
         for b in mybinds.load_binds():
             self.mine_tree.insert("", "end", iid=b["combo"],
-                                  values=(b["combo"], b.get("label", ""), b.get("command", "")))
+                                  values=(b["combo"], b.get("label", ""), b.get("resolution", ""),
+                                          b.get("command", "")))
         self.mine_path.config(text=f"Saved in {mybinds.binds_path()}")
 
     def edit_selected_bind(self):
         sel = self.mine_tree.selection()
         if sel:
-            combo, label, command = self.mine_tree.item(sel[0], "values")
-            self.edit_bind_dialog(combo, label, command, replacing=combo)
+            combo, label, resolution, command = self.mine_tree.item(sel[0], "values")
+            self.edit_bind_dialog(combo, label, command, replacing=combo, resolution=resolution)
 
     def remove_selected_bind(self):
         sel = self.mine_tree.selection()
@@ -360,7 +485,7 @@ class BindsMakerApp:
             self.refresh_mine()
             self.invalidate()
 
-    def edit_bind_dialog(self, combo_text, label="", command="", replacing=None):
+    def edit_bind_dialog(self, combo_text, label="", command="", replacing=None, resolution=""):
         win = tk.Toplevel(self.root)
         win.title("Save keybind")
         win.transient(self.root)
@@ -370,19 +495,26 @@ class BindsMakerApp:
         vars_ = {}
         for i, (name, title, value) in enumerate((("combo", "Key combo", combo_text),
                                                   ("label", "What it does", label),
+                                                  ("resolution", "Change resolution to (optional)", resolution),
                                                   ("command", "Command to run (optional)", command))):
             ttk.Label(frm, text=title).grid(row=i, column=0, sticky="w", pady=3)
             var = tk.StringVar(value=value)
             ttk.Entry(frm, textvariable=var, width=48).grid(row=i, column=1, sticky="we", pady=3, padx=(8, 0))
             vars_[name] = var
-        ttk.Label(frm, text="The command is used when you export an AutoHotkey / xbindkeys script.",
-                  foreground="gray").grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 8))
+        ttk.Label(frm, text="Resolution (e.g. 1920x1080@144) and command are used when you export a script.",
+                  foreground="gray").grid(row=4, column=0, columnspan=2, sticky="w", pady=(4, 8))
 
         def save():
             try:
                 combo = Combo.parse(vars_["combo"].get())
             except ComboError as exc:
                 messagebox.showerror("BindsMaker", f"Can't read that combo: {exc}", parent=win)
+                return
+            resolution = vars_["resolution"].get().strip()
+            try:
+                resolution = str(Resolution.parse(resolution)) if resolution else ""
+            except ResolutionError as exc:
+                messagebox.showerror("BindsMaker", str(exc), parent=win)
                 return
             others = [c for c in self.db().conflicts(combo) if c.app_id != "my-binds"]
             if others:
@@ -392,14 +524,15 @@ class BindsMakerApp:
                     return
             if replacing and replacing != str(combo):
                 mybinds.release(Combo.parse(replacing))
-            mybinds.reserve(combo, vars_["label"].get().strip(), vars_["command"].get().strip())
+            mybinds.reserve(combo, vars_["label"].get().strip(), vars_["command"].get().strip(),
+                            resolution=resolution)
             win.destroy()
             self.refresh_mine()
             self.invalidate()
             self.notebook.select(self.tab_mine)
 
         btns = ttk.Frame(frm)
-        btns.grid(row=4, column=0, columnspan=2, sticky="e")
+        btns.grid(row=5, column=0, columnspan=2, sticky="e")
         ttk.Button(btns, text="Cancel", command=win.destroy).pack(side="right")
         ttk.Button(btns, text="Save", command=save).pack(side="right", padx=6)
         win.bind("<Return>", lambda _e: save())

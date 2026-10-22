@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .keymaps import ahk_hotkey, xbindkeys_keys
 from .keys import Combo
+from .resolution import AHK_FUNCTION, Resolution, ahk_call, xrandr_command
 
 FORMATS = ("ahk", "xbindkeys")
 
@@ -23,15 +24,20 @@ def to_ahk(binds: list) -> str:
         combo = Combo.parse(bind["combo"])
         label = bind.get("label") or str(combo)
         command = bind.get("command")
+        res = bind.get("resolution")
         lines.append(f"; {str(combo)} - {label}")
         lines.append(f"{ahk_hotkey(combo)}::")
         lines.append("{")
+        if res:
+            lines.append(f"    {ahk_call(Resolution.parse(res))}")
         if command:
             lines.append(f"    Run({_ahk_string(command)})")
-        else:
+        if not res and not command:
             lines.append(f"    MsgBox({_ahk_string(f'{combo} pressed: put the action for “{label}” here')})")
         lines.append("}")
         lines.append("")
+    if any(b.get("resolution") for b in binds):
+        lines.append(AHK_FUNCTION)
     return "\n".join(lines)
 
 
@@ -40,7 +46,10 @@ def to_xbindkeys(binds: list) -> str:
     for bind in binds:
         combo = Combo.parse(bind["combo"])
         label = bind.get("label") or str(combo)
-        command = bind.get("command") or f"notify-send 'BindsMaker' '{combo}: {label}'"
+        commands = [xrandr_command(Resolution.parse(bind["resolution"]))] if bind.get("resolution") else []
+        if bind.get("command"):
+            commands.append(bind["command"])
+        command = " && ".join(commands) or f"notify-send 'BindsMaker' '{combo}: {label}'"
         lines.append(f"# {combo} - {label}")
         lines.append('"' + command.replace('"', '\\"') + '"')
         lines.append(f"    {xbindkeys_keys(combo)}")

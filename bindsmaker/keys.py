@@ -138,7 +138,10 @@ class Combo:
                     mods.add(mod)
                 continue
             if key is not None:
-                raise ComboError(f"more than one non-modifier key in {text!r}")
+                raise ComboError(
+                    f"{text!r} holds two normal keys at once. Hotkeys can only combine "
+                    "Ctrl/Alt/Shift/Win with one key - for something nobody else uses, "
+                    "try F13-F24, e.g. Ctrl+Alt+Shift+F13")
             key = normalize_key(part)
         if key is None:
             raise ComboError(f"no key in {text!r} (modifier-only combos are not supported)")
