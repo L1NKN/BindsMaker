@@ -1,0 +1,77 @@
+[
+  {
+    "id": "nvidia",
+    "name": "NVIDIA App / GeForce Experience overlay",
+    "category": "gaming",
+    "popularity": "high",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["nvidia overlay.exe", "nvcontainer.exe", "nvidia app.exe"],
+    "shortcuts": {
+      "Alt+Z": "Open overlay",
+      "Alt+R": "Performance overlay",
+      "Alt+F1": "Screenshot",
+      "Alt+F2": "Photo mode",
+      "Alt+F3": "Game filters",
+      "Alt+F8": "Toggle broadcast",
+      "Alt+F9": "Start/stop recording",
+      "Alt+F10": "Save instant replay",
+      "Alt+Shift+F10": "Toggle instant replay"
+    }
+  },
+  {
+    "id": "amd",
+    "name": "AMD Software: Adrenalin Edition",
+    "category": "gaming",
+    "popularity": "medium",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["radeonsoftware.exe", "amdrsserv.exe"],
+    "notes": "Defaults vary slightly between driver versions - check Settings > Hotkeys.",
+    "shortcuts": {
+      "Alt+R": "Open AMD Software overlay",
+      "Ctrl+Shift+E": "Start/stop recording",
+      "Ctrl+Shift+S": "Save instant replay",
+      "Ctrl+Shift+I": "Screenshot",
+      "Ctrl+Shift+O": "Toggle metrics overlay",
+      "Ctrl+Shift+G": "Start/stop streaming"
+    }
+  },
+  {
+    "id": "steam",
+    "name": "Steam",
+    "category": "gaming",
+    "popularity": "high",
+    "scope": "app",
+    "platforms": ["windows", "linux"],
+    "processes": ["steam.exe", "steam", "steamwebhelper.exe"],
+    "notes": "Overlay shortcuts are active inside every game launched through Steam.",
+    "shortcuts": {
+      "Shift+Tab": {"action": "Steam overlay (in game)", "scope": "global"},
+      "F12": {"action": "Screenshot (in game)", "scope": "global"}
+    }
+  },
+  {
+    "id": "obs",
+    "name": "OBS Studio",
+    "category": "gaming",
+    "popularity": "medium",
+    "scope": "global",
+    "platforms": ["windows", "linux"],
+    "processes": ["obs64.exe", "obs"],
+    "notes": "OBS ships with no default global hotkeys - reserve the ones you set with `bindsmaker reserve`.",
+    "shortcuts": {}
+  },
+  {
+    "id": "medal",
+    "name": "Medal.tv",
+    "category": "gaming",
+    "popularity": "low",
+    "scope": "global",
+    "platforms": ["windows"],
+    "processes": ["medal.exe"],
+    "shortcuts": {
+      "F8": "Save clip"
+    }
+  }
+]
